@@ -14,13 +14,13 @@ from datetime import datetime
 from pathlib import Path
 
 from app_database import (
-    check_database_status
+    check_database_status,
+    delete_document
 )
 from app_functions import (
     get_temp_files, 
     clean_temp_files
 )
-from app_documents import delete_document_from_db
 
 # Environment variables
 PG_DB_NAME = os.getenv('POSTGRES_DATABASE', os.getenv('DB_NAME', 'postgres'))

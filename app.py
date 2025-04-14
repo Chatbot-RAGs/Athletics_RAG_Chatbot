@@ -39,8 +39,10 @@ from pathlib import Path
 
 # Import app modules
 from app_documents import (
-    process_pdf_file, 
-    delete_document_from_db
+    process_pdf_file,
+    get_pdf_pages,
+    get_text_chunks,
+    process_dropbox_document
 )
 
 from app_vector import (
@@ -62,7 +64,11 @@ from app_database import (
     check_database_status, 
     execute_postgres_query, 
     execute_mysql_query,
-    sanitize_table_name
+    sanitize_table_name,
+    delete_document,
+    initialize_pgvector,
+    load_documents_from_database,
+    clear_all_documents
 )
 
 from app_dropbox import (
@@ -79,7 +85,8 @@ from app_dropbox import (
 
 from app_rag import (
     implement_parent_document_retriever,
-    fetch_parent_context
+    fetch_parent_context,
+    process_user_query
 )
 
 from app_search import (
@@ -100,6 +107,19 @@ from app_functions import (
     get_temp_files,
     clean_temp_files,
     get_answer_from_documents
+)
+
+from app_docs import (
+    get_document_stats,
+    get_document_info
+)
+
+from app_multi_search import (
+    multi_document_search
+)
+
+from app_llm import (
+    get_llm_response
 )
 
 # Import tab modules

@@ -133,3 +133,19 @@ def get_answer(question, context, retrieved_docs=None):
     except Exception as e:
         logging.error(f"Error getting answer: {str(e)}")
         return f"I encountered an error while processing your question: {str(e)}", "" 
+
+def get_llm_response(query, context, retrieved_docs=None):
+    """
+    Wrapper function for get_answer to maintain compatibility with app_rag.py and other modules.
+    
+    Args:
+        query (str): The user's question
+        context (str): The relevant context for answering the question
+        retrieved_docs (list, optional): List of retrieved document objects with metadata
+        
+    Returns:
+        str: The answer text only (without sources)
+    """
+    logging.info(f"get_llm_response called with query: {query[:50]}...")
+    answer, _ = get_answer(query, context, retrieved_docs)
+    return answer 
