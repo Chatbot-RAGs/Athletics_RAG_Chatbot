@@ -121,6 +121,28 @@ def implement_parent_document_retriever(documents: List[Document], doc_name: str
         logger.info(f"Adding {len(documents)} documents to the retriever")
         retriever.add_documents(documents)
         
+        # Also save documents to the documents table directly
+        # This ensures they appear in both tables
+        try:
+            from app_database import save_document_to_db
+            from app_embeddings import embeddings as embed_func
+            
+            # Generate embeddings for the documents
+            texts = [doc.page_content for doc in documents]
+            metadata_list = [doc.metadata for doc in documents]
+            
+            # Generate embeddings
+            embeddings_list = embed_func.embed_documents(texts)
+            
+            # Save to documents table
+            save_result = save_document_to_db(doc_name, texts, embeddings_list, metadata_list)
+            if save_result:
+                logger.info(f"Successfully saved {len(texts)} documents to documents table")
+            else:
+                logger.error(f"Failed to save documents to documents table")
+        except Exception as save_error:
+            logger.error(f"Error saving to documents table: {str(save_error)}")
+        
         logger.info(f"Successfully implemented Parent Document Retriever for {doc_name}")
         return True
         

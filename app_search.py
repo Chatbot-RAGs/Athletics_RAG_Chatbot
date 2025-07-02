@@ -82,7 +82,7 @@ def inspect_table_structure():
 
 def sql_keyword_search(query, doc_name=None, include_tables=True, table_boost=2.0, limit=50):
     """
-    Perform a SQL-based keyword search.
+    Perform a SQL-based keyword search with enhanced keyword extraction and matching.
     
     Args:
         query (str): Search query
@@ -103,10 +103,62 @@ def sql_keyword_search(query, doc_name=None, include_tables=True, table_boost=2.
         
         # Create a safe version of the query for SQL ILIKE
         safe_query = query.replace("%", "\\%").replace("_", "\\_")
-        terms = [term.strip() for term in safe_query.split() if term.strip()]
+        
+        # Enhanced keyword extraction
+        # 1. Extract individual terms
+        individual_terms = [term.strip() for term in safe_query.split() if term.strip() and len(term.strip()) > 2]
+        
+        # 2. Extract key phrases (2-3 word combinations)
+        words = [w for w in safe_query.split() if w.strip()]
+        phrases = []
+        for i in range(len(words)-1):
+            phrases.append(f"{words[i]} {words[i+1]}")
+        if len(words) >= 3:
+            for i in range(len(words)-2):
+                phrases.append(f"{words[i]} {words[i+1]} {words[i+2]}")
+        
+        # 3. Handle common sports terms and synonyms
+        sports_terms = {
+            "shot put": ["shot put", "shotput", "shot-put"],
+            "rules": ["rules", "regulations", "guidelines", "standards", "requirements"],
+            "track": ["track", "field", "athletics"],
+            "javelin": ["javelin", "spear"],
+            "discus": ["discus", "disc"],
+            "hammer": ["hammer throw", "hammer"],
+            "high jump": ["high jump", "highjump"],
+            "long jump": ["long jump", "longjump"],
+            "triple jump": ["triple jump", "triplejump"],
+            "pole vault": ["pole vault", "polevault"],
+            "hurdles": ["hurdles", "hurdle"],
+            "relay": ["relay", "relays"],
+            "sprint": ["sprint", "sprints", "sprinting"],
+            "marathon": ["marathon", "marathons"],
+            "race": ["race", "races", "racing"],
+            "meters": ["meters", "m", "metre", "metres"],
+            "competition": ["competition", "event", "meet", "tournament"]
+        }
+        
+        # Add sports-specific synonyms
+        expanded_terms = list(individual_terms)  # Start with original terms
+        for term in individual_terms:
+            term_lower = term.lower()
+            # Check if this term is a key in our sports dictionary
+            if term_lower in sports_terms:
+                expanded_terms.extend(sports_terms[term_lower])
+            # Check if this term is a value in our sports dictionary
+            for key, synonyms in sports_terms.items():
+                if term_lower in synonyms and key not in expanded_terms:
+                    expanded_terms.append(key)
+        
+        # Combine all terms and phrases
+        all_terms = list(set(expanded_terms + phrases))
+        
+        # Log the expanded terms for debugging
+        logging.info(f"Original query: '{query}'")
+        logging.info(f"Expanded search terms: {all_terms}")
         
         # If no valid terms, return empty list
-        if not terms:
+        if not all_terms:
             return []
         
         # Further simplified query structure for robustness
@@ -120,7 +172,7 @@ def sql_keyword_search(query, doc_name=None, include_tables=True, table_boost=2.
         conditions = []
         
         # Build search conditions for each term (AND logic between terms)
-        for term in terms:
+        for term in all_terms:
             term_conditions = []
             
             # Basic content search

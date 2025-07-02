@@ -275,6 +275,12 @@ def process_pdf_file(file, save_to_dropbox=False):
             
         logging.info(f"Created {len(documents)} chunks from {file.name}")
         
+        # First, make sure any existing document with the same name is deleted
+        # This ensures we don't have orphaned entries in either table
+        from app_database import delete_document
+        delete_document(file.name)
+        logging.info(f"Deleted any existing document with name: {file.name}")
+        
         # Process documents with Parent Document Retriever pattern
         success = implement_parent_document_retriever(documents, file.name)
         
@@ -284,6 +290,23 @@ def process_pdf_file(file, save_to_dropbox=False):
             if not create_vector_store(documents, file.name):
                 logging.error(f"Failed to create vector store for {file.name}")
                 return False
+        
+        # Verify document was properly stored
+        from app_database import load_documents_from_database
+        docs_in_db = load_documents_from_database()
+        if file.name in docs_in_db:
+            chunk_count = docs_in_db[file.name].get("chunk_count", 0)
+            langchain_chunks = docs_in_db[file.name].get("langchain_chunks", 0)
+            logging.info(f"Verified document storage: {chunk_count} chunks in documents table, {langchain_chunks} in langchain_pg_embedding")
+            
+            if chunk_count == 0 and langchain_chunks == 0:
+                logging.error(f"Document appears to be stored but has 0 chunks in both tables")
+                # Try direct vector store creation as a last resort
+                create_vector_store(documents, file.name)
+        else:
+            logging.warning(f"Document {file.name} not found in database after processing")
+            # Try direct vector store creation as a last resort
+            create_vector_store(documents, file.name)
         
         # Save to Dropbox if requested
         if save_to_dropbox and is_dropbox_configured():
@@ -303,4 +326,45 @@ def process_pdf_file(file, save_to_dropbox=False):
         return True
     except Exception as e:
         logging.error(f"Error processing file {file.name}: {str(e)}")
+        return False
+
+def process_dropbox_document(file_path):
+    """
+    Process a document from Dropbox.
+    
+    Args:
+        file_path: Path to the file in Dropbox
+        
+    Returns:
+        bool: True if processing was successful
+    """
+    try:
+        logging.info(f"Processing Dropbox document: {file_path}")
+        
+        # Get Dropbox client
+        from app_dropbox import get_dropbox_client, download_dropbox_file, create_file_like_object
+        
+        dbx = get_dropbox_client()
+        if not dbx:
+            logging.error("Failed to get Dropbox client")
+            return False
+            
+        # Download file from Dropbox
+        file_data = download_dropbox_file(file_path, dbx)
+        if not file_data:
+            logging.error(f"Failed to download file from Dropbox: {file_path}")
+            return False
+            
+        # Create file-like object
+        file_name = os.path.basename(file_path)
+        file_obj = create_file_like_object(file_data, file_name)
+        if not file_obj:
+            logging.error(f"Failed to create file-like object for: {file_path}")
+            return False
+            
+        # Process the file using the existing process_pdf_file function
+        return process_pdf_file(file_obj)
+        
+    except Exception as e:
+        logging.error(f"Error processing Dropbox document {file_path}: {str(e)}")
         return False

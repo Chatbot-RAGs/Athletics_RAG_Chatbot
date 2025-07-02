@@ -1050,15 +1050,14 @@ def clear_all_documents():
         count = cursor.fetchone()[0]
         
         if count == 0:
-            logging.info("No documents found to delete")
-            cursor.close()
-            conn.close()
-            return 0
-            
-        # Delete all documents
-        cursor.execute("DELETE FROM documents")
+            logging.info("No documents found to delete in documents table")
+            # Still check langchain_pg_embedding table
+        else:
+            # Delete all documents
+            cursor.execute("DELETE FROM documents")
+            logging.info(f"Deleted {count} documents from documents table")
         
-        # Also clear langchain_pg_embedding if it exists
+        # Always clear langchain_pg_embedding if it exists, regardless of documents table
         try:
             # Check if langchain_pg_embedding table exists
             cursor.execute("""
@@ -1071,17 +1070,26 @@ def clear_all_documents():
             table_exists = cursor.fetchone()[0]
             
             if table_exists:
-                cursor.execute("DELETE FROM langchain_pg_embedding")
-                logging.info("Cleared all entries from langchain_pg_embedding table")
+                # Get count of embeddings before deleting
+                cursor.execute("SELECT COUNT(*) FROM langchain_pg_embedding")
+                embedding_count = cursor.fetchone()[0]
+                
+                if embedding_count > 0:
+                    # Delete all embeddings
+                    cursor.execute("DELETE FROM langchain_pg_embedding")
+                    logging.info(f"Cleared {embedding_count} entries from langchain_pg_embedding table")
+                else:
+                    logging.info("No embeddings found in langchain_pg_embedding table")
         except Exception as e:
-            logging.warning(f"Error clearing langchain_pg_embedding: {str(e)}")
+            logging.error(f"Error clearing langchain_pg_embedding: {str(e)}")
         
         conn.commit()
         cursor.close()
         conn.close()
         
-        logging.info(f"Cleared all documents from database: {count} chunks deleted")
-        return count
+        total_deleted = count + (embedding_count if 'embedding_count' in locals() else 0)
+        logging.info(f"Cleared all documents from database: {total_deleted} total items deleted")
+        return total_deleted
     except Exception as e:
         logging.error(f"Error clearing documents: {str(e)}")
         if conn:
@@ -1126,4 +1134,4 @@ def get_connection_pool_stats():
             "total": 0
         },
         "status": "Connections are now managed directly without a pool"
-    } 
+    }

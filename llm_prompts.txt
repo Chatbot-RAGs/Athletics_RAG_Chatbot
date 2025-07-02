@@ -1,0 +1,18 @@
+LLM PROMPTING STRATEGIES SUMMARY
+
+1. Document Q&A (RAG Explorer)
+- Purpose: Concise, factual responses with source citations
+- Model: DeepSeek Chat v3 (temperature: 0.3)
+- Style: Instructional, factual, direct
+
+2. Database Data Analysis
+- Purpose: Engaging, conversational analysis with visualizations
+- Model: DeepSeek Chat v3 (temperature: 0.85)
+- Style: Storytelling, friendly, comprehensive
+- Always uses full dataset
+
+3. SQL Query Generation
+- Purpose: Convert natural language to SQL
+- Model: DeepSeek Chat v3 (temperature: 0.1)
+- Style: Technical, precise
+- Handles athletics abbreviations (e.g., "800m" → "800 Metres")

@@ -99,7 +99,6 @@ from app_functions import (
     format_retrieval_context,
     create_prompt_with_context,
     extract_and_cite_answer,
-    process_user_query,
     format_metrics_for_streamlit
 )
 

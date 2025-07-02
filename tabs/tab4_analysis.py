@@ -59,10 +59,24 @@ def show_analysis_tab():
             
             st.success(f"✅ **Active Dataset:** {len(df)} rows × {len(df.columns)} columns")
             
+            # Create a scrollable container with the entire dataset
+            st.write("### Full Dataset (scrollable)")
+            container_height = 400  # Height in pixels
+            
             if st.session_state.use_polars:
-                st.dataframe(df.head(5).to_pandas(), use_container_width=True)
+                # For Polars DataFrame, convert to pandas first
+                st.dataframe(
+                    df.to_pandas(), 
+                    use_container_width=True,
+                    height=container_height
+                )
             else:
-                st.dataframe(df.head(5), use_container_width=True)
+                # For Pandas DataFrame
+                st.dataframe(
+                    df, 
+                    use_container_width=True,
+                    height=container_height
+                )
             
             with st.form("analysis_form"):
                 st.subheader("Ask Questions About Your Data")
@@ -292,4 +306,4 @@ def show_analysis_tab():
             - OpenRouter gives reliable text analysis
             - PandasAI is best for generating visualizations
             - Hybrid combines both approaches
-            """) 
+            """)

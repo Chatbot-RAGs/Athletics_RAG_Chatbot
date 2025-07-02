@@ -161,26 +161,35 @@ def show_mysql_tab():
                         schema_context = f"Error getting schema: {str(e)}"
 
                     prompt = f"""
-                    You are a SQL query generator. Convert this natural language query to valid SQL.
+                    Convert this natural language query to valid SQL.
                     Database: MySQL (database name: {mysql_db_name})
 
                     Database Schema:
                     {schema_context}
 
+                    IMPORTANT: 
+                    1. ONLY use tables and columns that are explicitly listed in the schema above.
+                    2. DO NOT reference any tables or columns that are not listed in the schema.
+                    3. Include the database name in your queries, but DO NOT use backticks.
+                    4. For example, use: SELECT * FROM {mysql_db_name}.table_name instead of SELECT * FROM `{mysql_db_name}`.`table_name`
+                    5. If you cannot find appropriate tables for the query, use a simple query on one of the available tables.
+                    6. For athletics data, be flexible with event names:
+                       - For '100m', search using '%100%' not just '100 Metres'
+                       - For '800m', search using '%800%' not just '800 Metres'
+                       - Use broader patterns to catch all variations
+                    7. Use LIKE with wildcards for text searches to improve matching, e.g., WHERE Event LIKE '%800%'
+                    8. DO NOT use backticks (`) around table or column names as they can cause issues.
+
                     Natural language query: {mysql_nl_query}
 
                     Respond with ONLY the SQL query, nothing else. Make sure it's syntactically correct MySQL.
                     """
-                    client = openai.OpenAI(
-                        base_url="https://openrouter.ai/api/v1",
-                        api_key=openrouter_api_key,
-                    )
-                    response = client.chat.completions.create(
-                        model="deepseek/deepseek-chat-v3-0324:free",
-                        messages=[{"role": "user", "content": prompt}],
-                        temperature=0.1,
-                    )
-                    sql_query = response.choices[0].message.content.strip()
+                    
+                    # Import the specialized MySQL LLM response function
+                    from app_llm import get_mysql_llm_response
+                    
+                    # Use the specialized function with DeepSeek Chat v3 model
+                    sql_query = get_mysql_llm_response(prompt)
                     if "```sql" in sql_query or "```" in sql_query:
                         if "```sql" in sql_query:
                             parts = sql_query.split("```sql")
@@ -195,6 +204,30 @@ def show_mysql_tab():
                     sql_query = sql_query.replace("```sql", "").replace("```", "").strip()
                     st.write("### Generated SQL")
                     st.code(sql_query, language="sql")
+                    
+                    # Check if the query might reference non-existent tables
+                    # This is a simple check that looks for table names in the query
+                    # that aren't in the list of tables we got from the database
+                    if tables:
+                        # Extract potential table names from the query
+                        # This is a simple approach and might not catch all cases
+                        query_words = sql_query.replace(';', ' ').replace(',', ' ').replace('(', ' ').replace(')', ' ').split()
+                        potential_tables = [word for word in query_words if word.lower() not in 
+                                          ['select', 'from', 'where', 'group', 'by', 'having', 'order', 'limit', 
+                                           'join', 'inner', 'outer', 'left', 'right', 'on', 'as', 'and', 'or', 
+                                           'not', 'in', 'between', 'is', 'null', 'like', 'distinct', 'count', 
+                                           'sum', 'avg', 'min', 'max', 'case', 'when', 'then', 'else', 'end',
+                                           'union', 'all', 'insert', 'update', 'delete', 'create', 'alter', 'drop',
+                                           'table', 'view', 'index', 'primary', 'key', 'foreign', 'references',
+                                           'default', 'constraint', 'unique', 'check', 'column', 'database', 'schema']]
+                        
+                        # Check if any potential table name is not in the list of tables
+                        unknown_tables = [table for table in potential_tables if table not in tables and '.' not in table]
+                        if unknown_tables:
+                            st.warning(f"⚠️ The generated SQL query might reference tables that don't exist: {', '.join(unknown_tables)}")
+                            st.info("Available tables: " + ", ".join(tables))
+                            st.info("Consider clicking 'List Tables' to see all available tables, then try again with a more specific query.")
+                    
                     if should_execute_mysql:
                         result = execute_mysql_query(sql_query)  # No need to pass database name
                         if result["success"]:
@@ -261,4 +294,4 @@ def show_mysql_tab():
                             st.json(result)
             except Exception as e:
                 st.error(f"Error in natural language query: {str(e)}")
-                st.error(traceback.format_exc()) 
+                st.error(traceback.format_exc())

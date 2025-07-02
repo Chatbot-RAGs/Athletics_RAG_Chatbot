@@ -73,7 +73,7 @@ def show_rag_tab():
         st.session_state.last_rag_answer = ""
     
     # Create three columns for a clearer info panel at the top
-    info_col1, info_col2, info_col3 = st.columns([1,1,1])
+    info_col1, info_col2, info_col3 = st.columns([1, 1, 1])
     with info_col1:
         st.info("📚 Select documents →")
     with info_col2:
@@ -200,7 +200,7 @@ def show_rag_tab():
                                     if not vector_store:
                                         st.error("Failed to initialize vector store")
                                         return
-                                        
+                                    
                                     results = multi_document_search(query=question, vector_store=vector_store, doc_names=None)
                                     
                                 except Exception as e:
@@ -234,8 +234,24 @@ def show_rag_tab():
                                         st.error("Failed to initialize vector store")
                                         return
                                     
-                                    # Call multi_document_search with the selected document IDs
-                                    results = multi_document_search(query=question, vector_store=vector_store, doc_names=selected_doc_ids)
+                                    # Log more details about the selected documents
+                                    logger.info(f"Selected document IDs for search: {selected_doc_ids}")
+                                    
+                                    # Make sure document IDs are properly formatted
+                                    # Extract just the document name without the chunk count
+                                    clean_doc_ids = []
+                                    for doc_id in selected_doc_ids:
+                                        # Remove any file extension if present
+                                        if '.' in doc_id:
+                                            base_name = doc_id.rsplit('.', 1)[0]
+                                            clean_doc_ids.append(base_name)
+                                        else:
+                                            clean_doc_ids.append(doc_id)
+                                    
+                                    logger.info(f"Clean document IDs for search: {clean_doc_ids}")
+                                    
+                                    # Call multi_document_search with the cleaned document IDs
+                                    results = multi_document_search(query=question, vector_store=vector_store, doc_names=clean_doc_ids)
                                     
                                 except Exception as e:
                                     st.error(f"Error during search: {str(e)}")
@@ -248,12 +264,12 @@ def show_rag_tab():
                                 st.success(f"✅ Found {len(results)} relevant document sections")
                                 
                                 # Prepare context from retrieved documents
-                                            combined_context = ""
-                                            for doc in results[:20]:
-                                                source = doc.metadata.get('source', 'Unknown')
-                                                page = doc.metadata.get('page', 'Unknown')
-                                                combined_context += f"\n\nSource: {source}, Page: {page}\nContent: {doc.page_content}"
-                                            
+                                combined_context = ""
+                                for doc in results[:20]:
+                                    source = doc.metadata.get('source', 'Unknown')
+                                    page = doc.metadata.get('page', 'Unknown')
+                                    combined_context += f"\n\nSource: {source}, Page: {page}\nContent: {doc.page_content}"
+                                
                                 # Get answer using the get_llm_response function
                                 answer = get_llm_response(query=question, context=combined_context)
                                 st.session_state.last_rag_answer = answer
@@ -328,7 +344,6 @@ def show_rag_tab():
                                     try:
                                         st.write(f"Searching for follow-up: '{followup_question}' in documents mode: All Documents")
                                         # Use None for doc_names to search all documents
-                                        # Get vector store first
                                         vector_store = get_vector_store()
                                         if not vector_store:
                                             st.error("Failed to initialize vector store")
@@ -339,7 +354,7 @@ def show_rag_tab():
                                         st.error(f"Error during follow-up search: {str(e)}")
                                         logging.error(f"Error during follow-up search: {str(e)}", exc_info=True)
                                         return
-            else:
+                                else:
                                     # Specific documents mode - use saved doc_ids from session state
                                     selected_doc_ids = st.session_state.get('selected_doc_ids', [])
                                     
@@ -351,13 +366,11 @@ def show_rag_tab():
                                         st.write(f"Searching for follow-up: '{followup_question}' in documents mode: Specific Documents")
                                         st.write(f"Selected document IDs: {selected_doc_ids}")
                                         
-                                        # Get vector store first
                                         vector_store = get_vector_store()
                                         if not vector_store:
                                             st.error("Failed to initialize vector store")
                                             return
                                         
-                                        # Call multi_document_search with the selected document IDs
                                         results = multi_document_search(query=combined_question, vector_store=vector_store, doc_names=selected_doc_ids)
                                     except Exception as e:
                                         st.error(f"Error during follow-up search: {str(e)}")
@@ -406,12 +419,12 @@ def show_rag_tab():
                                                     {doc.page_content[:250]}{"..." if len(doc.page_content) > 250 else ""}
                                                     </div>
                                                     """, unsafe_allow_html=True)
+                                else:
+                                    st.warning("No relevant documents found to answer your follow-up question. Try rephrasing.")
                             except Exception as e:
                                 st.error(f"Error during follow-up: {str(e)}")
                                 if debug_mode:
                                     st.error(traceback.format_exc())
-                    else:
-                                    st.warning("No relevant documents found to answer your follow-up question. Try rephrasing.")
         
         # Document Upload Tab
         with upload_tab:
@@ -453,10 +466,10 @@ def show_rag_tab():
                                     st.rerun()
                                 else:
                                     st.error("Failed to process document.")
-                except Exception as e:
+                            except Exception as e:
                                 st.error(f"Error processing document: {str(e)}")
-                    if debug_mode:
-                        st.error(traceback.format_exc())
+                                if debug_mode:
+                                    st.error(traceback.format_exc())
             
             with upload_col2:
                 st.markdown("### 📋 Upload Tips")
@@ -543,16 +556,15 @@ def show_rag_tab():
                             confirm_col1, confirm_col2 = st.columns([1, 1])
                             with confirm_col1:
                                 if st.button("Yes, delete all", type="primary"):
-                                with st.spinner("Deleting all documents..."):
+                                    with st.spinner("Deleting all documents..."):
                                         clear_all_documents()
                                         st.session_state.show_delete_all_warning = False
                                         st.success("All documents have been deleted.")
                                         st.rerun()
-                            
                             with confirm_col2:
                                 if st.button("Cancel"):
-                                st.session_state.show_delete_all_warning = False
-                                st.rerun()
+                                    st.session_state.show_delete_all_warning = False
+                                    st.rerun()
                     
                     with manage_col2:
                         st.markdown("### 📊 Statistics")
@@ -589,9 +601,9 @@ def show_rag_tab():
                 # Display required environment variables
                 st.markdown("### Required Environment Variables")
                 st.code("""
-                DROPBOX_APP_KEY=your_app_key
-                DROPBOX_APP_SECRET=your_app_secret
-                DROPBOX_REFRESH_TOKEN=your_refresh_token
+DROPBOX_APP_KEY=your_app_key
+DROPBOX_APP_SECRET=your_app_secret
+DROPBOX_REFRESH_TOKEN=your_refresh_token
                 """)
             else:
                 st.success("✅ Dropbox connection configured")
@@ -611,9 +623,9 @@ def show_rag_tab():
                     )
                     
                     # List PDF files in selected folder
-                            pdf_files = list_dropbox_pdf_files(selected_folder)
-                            
-                            if pdf_files:
+                    pdf_files = list_dropbox_pdf_files(selected_folder)
+                    
+                    if pdf_files:
                         st.success(f"Found {len(pdf_files)} PDF files in the selected folder")
                         
                         # Create a nice display of the files
@@ -623,11 +635,11 @@ def show_rag_tab():
                             col_idx = i % 3
                             with file_cols[col_idx]:
                                 st.markdown(f"""
-                                <div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                                <strong>📄 {file_info['name']}</strong><br>
-                                Size: {file_info['size'] / 1024:.1f} KB<br>
-                                Modified: {file_info['modified']}
-                                </div>
+<div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+<strong>📄 {file_info['name']}</strong><br>
+Size: {file_info['size'] / 1024:.1f} KB<br>
+Modified: {file_info['modified']}
+</div>
                                 """, unsafe_allow_html=True)
                         
                         # File selection for processing
@@ -645,20 +657,21 @@ def show_rag_tab():
                                     
                                     if success:
                                         st.success(f"✅ Dropbox file processed successfully: {selected_file}")
-                                                    else:
+                                    else:
                                         st.error("Failed to process Dropbox file.")
-                                                except Exception as e:
+                                except Exception as e:
                                     st.error(f"Error processing Dropbox file: {str(e)}")
                                     if debug_mode:
                                         st.error(traceback.format_exc())
                     else:
-                        st.info(f"No PDF files found in the selected folder.")
+                        st.info("No PDF files found in the selected folder.")
                         
                         # Option to create a new folder
                         new_folder = st.text_input("Create a new folder in Dropbox:")
                         if new_folder and st.button("Create Folder"):
                             try:
-                                create_dropbox_folder(f"{selected_folder}/{new_folder}" if selected_folder else new_folder)
+                                folder_path = f"{selected_folder}/{new_folder}" if selected_folder else new_folder
+                                create_dropbox_folder(folder_path)
                                 st.success(f"Folder created: {new_folder}")
                                 st.rerun()
                             except Exception as e:
